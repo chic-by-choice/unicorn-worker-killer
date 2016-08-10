@@ -23,7 +23,10 @@ module Unicorn::WorkerKiller
     sig = :TERM if @@kill_attempts > configuration.max_quit
     sig = :KILL if @@kill_attempts > configuration.max_term
 
-    logger.warn "#{self} send SIG#{sig} (pid: #{worker_pid}) alive: #{alive_sec} sec (trial #{@@kill_attempts})"
+    message = "#{self} send SIG#{sig} (pid: #{worker_pid}) alive: #{alive_sec} sec (trial #{@@kill_attempts})"
+    logger.warn message
+    $statsd.event message, '', alert_type: 'warning'
+
     Process.kill sig, worker_pid
   end
 
@@ -58,9 +61,13 @@ module Unicorn::WorkerKiller
       @_worker_check_count += 1
       if @_worker_check_count % @_worker_check_cycle == 0
         rss = GetProcessMem.new.bytes
-        logger.info "#{self}: worker (pid: #{Process.pid}) using #{rss} bytes." if @_verbose
+        message = "#{self}: worker (pid: #{Process.pid}) using #{rss} bytes."
+        logger.info message if @_verbose
+        $statsd.event message, '', alert_type: 'info'
         if rss > @_worker_memory_limit
-          logger.warn "#{self}: worker (pid: #{Process.pid}) exceeds memory limit (#{rss} bytes > #{@_worker_memory_limit} bytes)"
+          message = "#{self}: worker (pid: #{Process.pid}) exceeds memory limit (#{rss} bytes > #{@_worker_memory_limit} bytes)"
+          logger.warn message
+          $statsd.event message, '', alert_type: 'warning'
           Unicorn::WorkerKiller.kill_self(logger, @_worker_process_start)
         end
         @_worker_check_count = 0
@@ -96,10 +103,14 @@ module Unicorn::WorkerKiller
       @_worker_process_start ||= Time.now
       @_worker_cur_requests ||= @_worker_max_requests_min + randomize(@_worker_max_requests_max - @_worker_max_requests_min + 1)
       @_worker_max_requests ||= @_worker_cur_requests
-      logger.info "#{self}: worker (pid: #{Process.pid}) has #{@_worker_cur_requests} left before being killed" if @_verbose
+      message = "#{self}: worker (pid: #{Process.pid}) has #{@_worker_cur_requests} left before being killed"
+      logger.info message if @_verbose
+      $statsd.event message, '', alert_type: 'info'
 
       if (@_worker_cur_requests -= 1) <= 0
-        logger.warn "#{self}: worker (pid: #{Process.pid}) exceeds max number of requests (limit: #{@_worker_max_requests})"
+        message = "#{self}: worker (pid: #{Process.pid}) exceeds max number of requests (limit: #{@_worker_max_requests})"
+        logger.warn message
+        $statsd.event message, '', alert_type: 'warning'
         Unicorn::WorkerKiller.kill_self(logger, @_worker_process_start)
       end
     end
