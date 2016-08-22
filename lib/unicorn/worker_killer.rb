@@ -1,6 +1,9 @@
 require 'unicorn'
 require 'unicorn/worker_killer/configuration'
 require 'get_process_mem'
+require 'statsd'
+
+$statsd ||= Statsd.new
 
 module Unicorn::WorkerKiller
   class << self
