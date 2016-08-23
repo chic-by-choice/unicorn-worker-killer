@@ -4,6 +4,7 @@ require 'get_process_mem'
 require 'statsd'
 
 $statsd ||= Statsd.new
+RAILS_LOGGER = Logger.new('/var/www/chic/shared/log/production.log')
 
 module Unicorn::WorkerKiller
   class << self
@@ -28,7 +29,7 @@ module Unicorn::WorkerKiller
 
     message = "#{self} send SIG#{sig} (pid: #{worker_pid}) alive: #{alive_sec} sec (trial #{@@kill_attempts})"
     logger.warn message
-    Rails.logger.warn message
+    RAILS_LOGGER.warn message
     $statsd.event message, '', alert_type: 'warning'
 
     Process.kill sig, worker_pid
@@ -67,12 +68,12 @@ module Unicorn::WorkerKiller
         rss = GetProcessMem.new.bytes
         message = "#{self}: worker (pid: #{Process.pid}) using #{rss} bytes."
         logger.info message if @_verbose
-        Rails.logger.info message
+        RAILS_LOGGER.info message
         $statsd.event message, '', alert_type: 'info'
         if rss > @_worker_memory_limit
           message = "#{self}: worker (pid: #{Process.pid}) exceeds memory limit (#{rss} bytes > #{@_worker_memory_limit} bytes)"
           logger.warn message
-          Rails.logger.warn message
+          RAILS_LOGGER.warn message
           $statsd.event message, '', alert_type: 'warning'
           Unicorn::WorkerKiller.kill_self(logger, @_worker_process_start)
         end
@@ -111,13 +112,13 @@ module Unicorn::WorkerKiller
       @_worker_max_requests ||= @_worker_cur_requests
       message = "#{self}: worker (pid: #{Process.pid}) has #{@_worker_cur_requests} left before being killed"
       logger.info message if @_verbose
-      Rails.logger.info message
+      RAILS_LOGGER.info message
       $statsd.event message, '', alert_type: 'info'
 
       if (@_worker_cur_requests -= 1) <= 0
         message = "#{self}: worker (pid: #{Process.pid}) exceeds max number of requests (limit: #{@_worker_max_requests})"
         logger.warn message
-        Rails.logger.warn message
+        RAILS_LOGGER.warn message
         $statsd.event message, '', alert_type: 'warning'
         Unicorn::WorkerKiller.kill_self(logger, @_worker_process_start)
       end
