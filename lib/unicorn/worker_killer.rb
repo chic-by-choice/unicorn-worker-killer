@@ -4,7 +4,9 @@ require 'get_process_mem'
 require 'statsd'
 
 $statsd ||= Statsd.new
+$statsd.event 'unicorn-worker-killer getting ready', '', alert_type: 'info'
 RAILS_LOGGER = Logger.new('/var/www/chic/shared/log/production.log')
+RAILS_LOGGER.info 'unicorn-worker-killer getting ready'
 
 module Unicorn::WorkerKiller
   class << self
